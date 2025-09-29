@@ -1,0 +1,5 @@
+{
+  "name": "SIH: URL-Based Attack Detector",
+  "description": "A web dashboard to upload PCAP/Zeek logs, detect URL-based attacks using a hybrid rule-based and ML approach, and visualize the results with filters, charts, and data export capabilities.",
+  "requestFramePermissions": []
+}
