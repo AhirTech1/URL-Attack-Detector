@@ -1,4 +1,3 @@
-
 export interface DetectionResult {
   id: number;
   timestamp: string;
@@ -20,4 +19,9 @@ export interface FilterState {
   ip: string;
   attack_type: string;
   confidence: number;
+}
+
+export interface Alert {
+  id: string;
+  detection: DetectionResult;
 }

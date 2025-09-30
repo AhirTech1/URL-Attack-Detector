@@ -53,7 +53,8 @@ export const TopAttackersBarChart: React.FC<TopAttackersBarChartProps> = ({ data
           />
           <Legend />
           {/* FIX: Moved onClick from BarChart to Bar to resolve typing issues and simplify event handling. The onClick handler on a Bar element receives the data for that specific bar. */}
-          <Bar dataKey="count" name="Attack Count" fill="#38b2ac" cursor="pointer" onClick={(data) => onBarClick(data.ip)} />
+          {/* FIX: Explicitly type 'data' as 'any' to resolve incorrect type inference from '@types/recharts' which causes a compile error. The 'data' object at runtime contains the properties of the data point. */}
+          <Bar dataKey="count" name="Attack Count" fill="#38b2ac" cursor="pointer" onClick={(data: any) => onBarClick(data.ip)} />
         </BarChart>
       </ResponsiveContainer>
       )}
