@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { DetectionResult } from '../../types';
@@ -10,9 +9,10 @@ interface ChartData {
 
 interface TopAttackersBarChartProps {
   data: DetectionResult[];
+  onBarClick: (ip: string) => void;
 }
 
-export const TopAttackersBarChart: React.FC<TopAttackersBarChartProps> = ({ data }) => {
+export const TopAttackersBarChart: React.FC<TopAttackersBarChartProps> = ({ data, onBarClick }) => {
   const chartData = useMemo<ChartData[]>(() => {
     const ipCounts = data
       .filter(d => d.attack_prediction !== 'Benign')
@@ -52,7 +52,8 @@ export const TopAttackersBarChart: React.FC<TopAttackersBarChartProps> = ({ data
             }}
           />
           <Legend />
-          <Bar dataKey="count" name="Attack Count" fill="#38b2ac" />
+          {/* FIX: Moved onClick from BarChart to Bar to resolve typing issues and simplify event handling. The onClick handler on a Bar element receives the data for that specific bar. */}
+          <Bar dataKey="count" name="Attack Count" fill="#38b2ac" cursor="pointer" onClick={(data) => onBarClick(data.ip)} />
         </BarChart>
       </ResponsiveContainer>
       )}

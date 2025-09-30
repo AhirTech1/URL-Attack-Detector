@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { DetectionResult } from '../../types';
@@ -11,11 +12,12 @@ interface ChartData {
 
 interface AttackTypePieChartProps {
   data: DetectionResult[];
+  onSliceClick: (attackType: string) => void;
 }
 
 const COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6'];
 
-export const AttackTypePieChart: React.FC<AttackTypePieChartProps> = ({ data }) => {
+export const AttackTypePieChart: React.FC<AttackTypePieChartProps> = ({ data, onSliceClick }) => {
   const chartData = useMemo<ChartData[]>(() => {
     const attackCounts = data
       .filter(d => d.attack_prediction !== 'Benign')
@@ -48,6 +50,8 @@ export const AttackTypePieChart: React.FC<AttackTypePieChartProps> = ({ data }) 
             fill="#8884d8"
             dataKey="value"
             nameKey="name"
+            onClick={(data) => onSliceClick(data.name)}
+            cursor="pointer"
           >
             {chartData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

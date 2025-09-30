@@ -89,8 +89,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialSummary, onNewAnaly
       
       {!isLoading && !error && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 bg-surface rounded-lg shadow-lg p-4"><AttackTypePieChart data={allFetchedResults} /></div>
-          <div className="lg:col-span-2 bg-surface rounded-lg shadow-lg p-4"><TopAttackersBarChart data={allFetchedResults} /></div>
+          <div className="lg:col-span-1 bg-surface rounded-lg shadow-lg p-4">
+            <AttackTypePieChart
+              data={allFetchedResults}
+              onSliceClick={(attackType) => setFilters(prev => ({ ...prev, attack_type: attackType }))}
+            />
+          </div>
+          <div className="lg:col-span-2 bg-surface rounded-lg shadow-lg p-4">
+            <TopAttackersBarChart
+              data={allFetchedResults}
+              onBarClick={(ip) => setFilters(prev => ({ ...prev, ip }))}
+            />
+          </div>
           <div className="lg:col-span-3 bg-surface rounded-lg shadow-lg p-4"><AttackTimeline data={allFetchedResults} /></div>
         </div>
       )}
