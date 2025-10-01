@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Fragment } from 'react';
 import { getResults } from '../services/api';
 import type { DetectionResult, FilterState } from '../types';
 import { LoaderIcon, AlertTriangleIcon } from './icons';
+import { DetectionDetails } from './DetectionDetails';
 
 interface ResultsTableProps {
     filters: FilterState;
@@ -16,6 +17,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ filters }) => {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
   
   const fetchAndSetResults = useCallback(async (page: number) => {
     setIsLoading(true);
@@ -34,6 +36,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ filters }) => {
   
   useEffect(() => {
     setCurrentPage(1);
+    setExpandedRowId(null); // Collapse any open row when filters change
     fetchAndSetResults(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
@@ -41,6 +44,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ filters }) => {
   const handlePageChange = (newPage: number) => {
     if (newPage < 1) return;
     setCurrentPage(newPage);
+    setExpandedRowId(null); // Collapse any open row when page changes
     fetchAndSetResults(newPage);
   }
 
@@ -60,7 +64,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ filters }) => {
     <div>
         <h3 className="text-xl font-semibold mb-4 text-text-primary">Detection Results</h3>
         <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-primary">
+            <table className="min-w-full">
                 <thead className="bg-primary">
                     <tr>
                         {['Timestamp', 'Source IP', 'Host', 'URI', 'Attack Type', 'Confidence', 'Rule', 'Success'].map(header => (
@@ -79,16 +83,28 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ filters }) => {
                         <tr><td colSpan={8} className="text-center p-8 text-text-secondary">No results found for the current filters.</td></tr>
                     )}
                     {!isLoading && !error && results.map((r) => (
-                        <tr key={r.id} className="hover:bg-primary transition-colors">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{new Date(r.timestamp).toLocaleString()}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-text-primary">{r.src_ip}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{r.host}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-text-secondary" title={r.uri}>{truncateUri(r.uri)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">{r.attack_prediction === 'Benign' ? <span className="text-green-400">{r.attack_prediction}</span> : <span className="text-red-400">{r.attack_prediction}</span>}</td>
-                            <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${getConfidenceColor(r.confidence)}`}>{(r.confidence * 100).toFixed(1)}%</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{r.rule_matched ? <span className="px-2 py-1 bg-yellow-800/50 text-yellow-300 rounded-full text-xs">{r.rule_matched}</span> : 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{r.success_flag ? <span className="text-red-400 font-bold">Yes</span> : 'No'}</td>
-                        </tr>
+                        <Fragment key={r.id}>
+                            <tr
+                              onClick={() => setExpandedRowId(expandedRowId === r.id ? null : r.id)}
+                              className={`hover:bg-primary transition-colors duration-150 cursor-pointer ${expandedRowId === r.id ? 'bg-primary' : ''}`}
+                            >
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{new Date(r.timestamp).toLocaleString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-text-primary">{r.src_ip}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{r.host}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-text-secondary" title={r.uri}>{truncateUri(r.uri)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">{r.attack_prediction === 'Benign' ? <span className="text-green-400">{r.attack_prediction}</span> : <span className="text-red-400">{r.attack_prediction}</span>}</td>
+                                <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${getConfidenceColor(r.confidence)}`}>{(r.confidence * 100).toFixed(1)}%</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{r.rule_matched ? <span className="px-2 py-1 bg-yellow-800/50 text-yellow-300 rounded-full text-xs">{r.rule_matched}</span> : 'N/A'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{r.success_flag ? <span className="text-red-400 font-bold">Yes</span> : 'No'}</td>
+                            </tr>
+                            {expandedRowId === r.id && (
+                                <tr>
+                                    <td colSpan={8} className="p-0">
+                                        <DetectionDetails detection={r} />
+                                    </td>
+                                </tr>
+                            )}
+                        </Fragment>
                     ))}
                 </tbody>
             </table>
